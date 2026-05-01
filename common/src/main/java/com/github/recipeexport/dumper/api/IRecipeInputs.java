@@ -3,9 +3,6 @@ package com.github.recipeexport.dumper.api;
 import com.google.gson.JsonObject;
 import net.minecraft.world.item.crafting.Ingredient;
 
-/**
- * 配方输入收集器。
- */
 public interface IRecipeInputs {
     void addInput(int slot, Ingredient ingredient, int count);
 
@@ -15,4 +12,3 @@ public interface IRecipeInputs {
 
     JsonObject serialize() throws RecipeDumpException;
 }
-

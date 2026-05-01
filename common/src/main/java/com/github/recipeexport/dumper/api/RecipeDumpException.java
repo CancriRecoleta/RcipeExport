@@ -1,8 +1,5 @@
 package com.github.recipeexport.dumper.api;
 
-/**
- * 配方导出过程中抛出的受检异常。
- */
 public class RecipeDumpException extends Exception {
     public RecipeDumpException() {
         super();
@@ -16,4 +13,3 @@ public class RecipeDumpException extends Exception {
         super(message, cause);
     }
 }
-

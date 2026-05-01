@@ -7,8 +7,9 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.SmithingRecipe;
 
 /**
- * 锻造台配方导出器（兼容 SmithingTransformRecipe / SmithingTrimRecipe）。
- * 1.21.1 中 {@link SmithingRecipe#getIngredients()} 返回 [template, base, addition]。
+ * Smithing recipe dumper for both transform and trim recipes.
+ * In 1.21.x, {@link SmithingRecipe#getIngredients()} returns
+ * [template, base, addition].
  */
 public class SmithingRecipeDumper implements IRecipeDumper<SmithingRecipe> {
 
@@ -20,4 +21,3 @@ public class SmithingRecipeDumper implements IRecipeDumper<SmithingRecipe> {
         }
     }
 }
-
