@@ -16,7 +16,7 @@ public class SmithingRecipeDumper implements IRecipeDumper<SmithingRecipe> {
     @Override
     public void setInputs(SmithingRecipe recipe, IRecipeInputs inputs) {
         recipe.templateIngredient().ifPresent(ingredient -> inputs.addInput(1, ingredient));
-        recipe.baseIngredient().ifPresent(ingredient -> inputs.addInput(2, ingredient));
+        inputs.addInput(2, recipe.baseIngredient());
         recipe.additionIngredient().ifPresent(ingredient -> inputs.addInput(3, ingredient));
     }
 
