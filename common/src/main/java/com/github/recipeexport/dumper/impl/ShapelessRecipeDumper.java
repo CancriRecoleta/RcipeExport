@@ -2,15 +2,16 @@ package com.github.recipeexport.dumper.impl;
 
 import com.github.recipeexport.dumper.api.IRecipeDumper;
 import com.github.recipeexport.dumper.api.IRecipeInputs;
-import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
+
+import java.util.List;
 
 public class ShapelessRecipeDumper implements IRecipeDumper<ShapelessRecipe> {
 
     @Override
     public void setInputs(ShapelessRecipe recipe, IRecipeInputs inputs) {
-        NonNullList<Ingredient> ingredients = recipe.getIngredients();
+        List<Ingredient> ingredients = RecipeIntrospection.readIngredients(recipe);
         for (int i = 0; i < ingredients.size(); i++) {
             inputs.addInput(i + 1, ingredients.get(i));
         }

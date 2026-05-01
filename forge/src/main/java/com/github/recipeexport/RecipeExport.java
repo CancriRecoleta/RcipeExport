@@ -1,7 +1,6 @@
 package com.github.recipeexport;
 
 import com.github.recipeexport.dumper.impl.DumpRecipeCommand;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -10,7 +9,7 @@ public class RecipeExport {
 
     public RecipeExport() {
         CommonClass.init();
-        MinecraftForge.EVENT_BUS.addListener(this::onRegisterCommands);
+        RegisterCommandsEvent.BUS.addListener(this::onRegisterCommands);
     }
 
     public void onRegisterCommands(RegisterCommandsEvent event) {

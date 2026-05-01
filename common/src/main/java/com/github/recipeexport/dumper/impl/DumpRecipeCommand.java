@@ -19,13 +19,15 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
@@ -43,7 +45,7 @@ public final class DumpRecipeCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("dumprecipe")
-                .requires(src -> src.getServer().isSingleplayer() || src.hasPermission(2))
+                .requires(DumpRecipeCommand::canUseCommand)
                 .then(Commands.argument("mod", StringArgumentType.word())
                         .suggests(MOD_SUGGESTIONS)
                         .executes(DumpRecipeCommand::executeCommand)
@@ -87,9 +89,9 @@ public final class DumpRecipeCommand {
     public static DumpResult dumpAllRecipes(RecipeManager recipeManager, String modFilter, HolderLookup.Provider registries) {
         DumpResult result = new DumpResult();
         for (RecipeHolder<?> holder : recipeManager.getRecipes()) {
-            ResourceLocation id = holder.id();
+            ResourceKey<Recipe<?>> id = holder.id();
             Recipe<?> recipe = holder.value();
-            if (!id.getNamespace().equals(modFilter)) {
+            if (!getNamespace(id).equals(modFilter)) {
                 continue;
             }
             IRecipeDumper<Recipe<?>> dumper = RecipeDumpers.get(recipe.getClass());
@@ -103,19 +105,19 @@ public final class DumpRecipeCommand {
                 result.addRecipe(category, dumpedRecipe);
             } catch (RecipeDumpException e) {
                 Constants.LOG.warn("Failed to dump recipe {}: {}", id, e.getMessage());
-                result.errorRecipes.add(id);
+                result.errorRecipes.add(getRecipeIdString(id));
             } catch (Throwable t) {
                 Constants.LOG.warn("Unexpected error while dumping recipe {}", id, t);
-                result.errorRecipes.add(id);
+                result.errorRecipes.add(getRecipeIdString(id));
             }
         }
         return result;
     }
 
-    private static JsonObject dumpRecipe(ResourceLocation id, Recipe<?> recipe, IRecipeDumper<Recipe<?>> dumper, HolderLookup.Provider registries) throws RecipeDumpException {
+    private static JsonObject dumpRecipe(ResourceKey<Recipe<?>> id, Recipe<?> recipe, IRecipeDumper<Recipe<?>> dumper, HolderLookup.Provider registries) throws RecipeDumpException {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("type", dumper.getRecipeTypeName(recipe));
-        jsonObject.addProperty("name", id.toString());
+        jsonObject.addProperty("name", getRecipeIdString(id));
 
         RecipeInputs inputs = new RecipeInputs();
         RecipeOutputs outputs = new RecipeOutputs();
@@ -125,6 +127,73 @@ public final class DumpRecipeCommand {
         jsonObject.add("output", outputs.serialize(registries));
         dumper.writeExtraInformation(recipe, jsonObject);
         return jsonObject;
+    }
+
+    private static boolean canUseCommand(CommandSourceStack source) {
+        MinecraftServer server = source.getServer();
+        if (server != null && server.isSingleplayer()) {
+            return true;
+        }
+        // 兼容不同映射/版本：优先尝试 hasPermission(int)，不存在则尝试 hasPermissionLevel(int)
+        return callPermissionMethod(source, "hasPermission", 2) || callPermissionMethod(source, "hasPermissionLevel", 2);
+    }
+
+    private static boolean callPermissionMethod(CommandSourceStack source, String methodName, int level) {
+        try {
+            Method method = CommandSourceStack.class.getMethod(methodName, int.class);
+            Object result = method.invoke(source, level);
+            return result instanceof Boolean b && b;
+        } catch (ReflectiveOperationException ignored) {
+            return false;
+        }
+    }
+
+    private static String getNamespace(ResourceKey<Recipe<?>> id) {
+        try {
+            Method method = id.getClass().getMethod("location");
+            Object location = method.invoke(id);
+            String namespace = invokeStringNoArg(location, "getNamespace");
+            if (namespace != null && !namespace.isEmpty()) {
+                return namespace;
+            }
+            String locationString = String.valueOf(location);
+            int colon = locationString.indexOf(':');
+            return colon > 0 ? locationString.substring(0, colon) : "";
+        } catch (ReflectiveOperationException ignored) {
+        }
+
+        String raw = getRecipeIdString(id);
+        int colon = raw.indexOf(':');
+        return colon > 0 ? raw.substring(0, colon) : "";
+    }
+
+    private static String getRecipeIdString(ResourceKey<Recipe<?>> id) {
+        try {
+            Method method = id.getClass().getMethod("location");
+            Object location = method.invoke(id);
+            return String.valueOf(location);
+        } catch (ReflectiveOperationException ignored) {
+        }
+
+        String raw = id.toString();
+        int slash = raw.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < raw.length()) {
+            return raw.substring(slash + 1).replace("]", "").trim();
+        }
+        return raw;
+    }
+
+    private static String invokeStringNoArg(Object target, String methodName) {
+        if (target == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            Object result = method.invoke(target);
+            return result == null ? null : result.toString();
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     private static String sanitizeCategory(String category) {
@@ -149,7 +218,7 @@ public final class DumpRecipeCommand {
 
     public static final class DumpResult {
         private final Map<String, JsonArray> categoryRecipes = new TreeMap<>();
-        private final Set<ResourceLocation> errorRecipes = new HashSet<>();
+        private final Set<String> errorRecipes = new HashSet<>();
 
         private void addRecipe(String category, JsonObject recipe) {
             categoryRecipes.computeIfAbsent(category, key -> new JsonArray()).add(recipe);
@@ -176,7 +245,7 @@ public final class DumpRecipeCommand {
         public JsonObject createErrorJson() {
             JsonObject json = new JsonObject();
             JsonArray recipes = new JsonArray();
-            errorRecipes.forEach(id -> recipes.add(id.toString()));
+            errorRecipes.forEach(recipes::add);
             json.addProperty("count", errorRecipes.size());
             json.add("recipes", recipes);
             return json;
