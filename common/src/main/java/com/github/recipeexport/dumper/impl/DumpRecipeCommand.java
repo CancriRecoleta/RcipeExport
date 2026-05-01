@@ -43,7 +43,7 @@ public final class DumpRecipeCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("dumprecipe")
-                .requires(src -> src.hasPermission(2))
+                .requires(src -> src.getServer().isSingleplayer() || src.hasPermission(2))
                 .then(Commands.argument("mod", StringArgumentType.word())
                         .suggests(MOD_SUGGESTIONS)
                         .executes(DumpRecipeCommand::executeCommand)
