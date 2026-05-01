@@ -1,6 +1,8 @@
 package com.github.recipeexport;
 
+import com.github.recipeexport.dumper.impl.DumpRecipeCommand;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
 public class RecipeExport implements ModInitializer {
 
@@ -14,5 +16,9 @@ public class RecipeExport implements ModInitializer {
         // Use Fabric to bootstrap the Common mod.
         Constants.LOG.info("Hello Fabric world!");
         CommonClass.init();
+
+        // 注册 /dumprecipe 命令
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) ->
+                DumpRecipeCommand.register(dispatcher));
     }
 }

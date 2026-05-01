@@ -32,4 +32,9 @@ public interface IPlatformHelper {
     default String getEnvironmentName() {
         return isDevelopmentEnvironment() ? "development" : "production";
     }
+
+    /**
+     * 获取当前所有已加载的 mod ID 集合，用于命令补全。
+     */
+    java.util.Collection<String> getLoadedModIds();
 }
