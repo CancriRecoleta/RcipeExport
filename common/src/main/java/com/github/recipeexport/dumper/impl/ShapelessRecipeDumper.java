@@ -20,5 +20,9 @@ public class ShapelessRecipeDumper implements IRecipeDumper<ShapelessRecipe> {
     public String getRecipeTypeName(ShapelessRecipe recipe) {
         return "crafting_shapeless";
     }
-}
 
+    @Override
+    public String getRecipeCategoryName(ShapelessRecipe recipe) {
+        return "crafting_shapeless";
+    }
+}

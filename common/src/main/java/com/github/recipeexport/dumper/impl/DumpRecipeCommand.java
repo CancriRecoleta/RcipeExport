@@ -29,15 +29,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
-/**
- * /dumprecipe &lt;mod&gt; 命令的实现。
- */
-public final class
-DumpRecipeCommand {
-
-    private static final Set<ResourceLocation> ERROR_RECIPES = new HashSet<>();
+public final class DumpRecipeCommand {
 
     private static final SuggestionProvider<CommandSourceStack> MOD_SUGGESTIONS =
             (ctx, builder) -> SharedSuggestionProvider.suggest(Services.PLATFORM.getLoadedModIds(), builder);
@@ -62,56 +58,65 @@ DumpRecipeCommand {
             source.sendFailure(Component.literal("No such a mod: " + modId));
             return 0;
         }
+
         RecipeManager recipeManager = source.getServer().getRecipeManager();
         HolderLookup.Provider registries = source.registryAccess();
+        DumpResult dumpResult = dumpAllRecipes(recipeManager, modId, registries);
 
-        JsonArray recipesArray = dumpAllRecipes(recipeManager, modId, registries);
         JsonObject result = new JsonObject();
-        result.add("recipes", recipesArray);
-        JsonArray errorArray = new JsonArray();
-        ERROR_RECIPES.forEach(id -> errorArray.add(id.toString()));
-        result.add("error", errorArray);
+        result.addProperty("mod", modId);
+        result.add("summary", dumpResult.createSummary());
+        result.add("recipes", dumpResult.createCategoriesJson());
+        result.add("error", dumpResult.createErrorJson());
 
-        File file = new File(String.format("export/dump_recipes_%s.json", modId));
-        outputJson(file, result);
+        File outputDirectory = new File(String.format("export/%s", modId));
+        outputJson(new File(outputDirectory, "recipes.json"), result);
+        outputJson(new File(String.format("export/dump_recipes_%s.json", modId)), result);
+        dumpResult.writeCategoryFiles(outputDirectory);
 
-        int recipesCount = recipesArray.size();
-        int skipped = ERROR_RECIPES.size();
-        source.sendSuccess(() -> Component.literal("Dump recipes successfully! See export directory."), false);
-        source.sendSuccess(() -> Component.literal(String.format("%s recipes dumped, %s recipes skipped", recipesCount, skipped)), false);
-        ERROR_RECIPES.clear();
+        int recipesCount = dumpResult.getDumpedCount();
+        int skipped = dumpResult.getSkippedCount();
+        source.sendSuccess(() -> Component.literal("Dump recipes successfully! See export/" + modId + " directory."), false);
+        source.sendSuccess(() -> Component.literal(String.format("%s recipes dumped in %s categories, %s recipes skipped",
+                recipesCount,
+                dumpResult.categoryRecipes.size(),
+                skipped)), false);
         return recipesCount;
     }
 
-    public static JsonArray dumpAllRecipes(RecipeManager recipeManager, String modFilter, HolderLookup.Provider registries) {
-        JsonArray array = new JsonArray();
+    public static DumpResult dumpAllRecipes(RecipeManager recipeManager, String modFilter, HolderLookup.Provider registries) {
+        DumpResult result = new DumpResult();
         for (RecipeHolder<?> holder : recipeManager.getRecipes()) {
             ResourceLocation id = holder.id();
             Recipe<?> recipe = holder.value();
             if (!id.getNamespace().equals(modFilter)) {
                 continue;
             }
-            if (!RecipeDumpers.has(recipe.getClass())) {
+            IRecipeDumper<Recipe<?>> dumper = RecipeDumpers.get(recipe.getClass());
+            if (dumper == null) {
                 continue;
             }
             try {
-                array.add(dumpRecipe(id, recipe, registries));
+                JsonObject dumpedRecipe = dumpRecipe(id, recipe, dumper, registries);
+                String category = sanitizeCategory(dumper.getRecipeCategoryName(recipe));
+                dumpedRecipe.addProperty("category", category);
+                result.addRecipe(category, dumpedRecipe);
             } catch (RecipeDumpException e) {
                 Constants.LOG.warn("Failed to dump recipe {}: {}", id, e.getMessage());
-                ERROR_RECIPES.add(id);
+                result.errorRecipes.add(id);
             } catch (Throwable t) {
                 Constants.LOG.warn("Unexpected error while dumping recipe {}", id, t);
-                ERROR_RECIPES.add(id);
+                result.errorRecipes.add(id);
             }
         }
-        return array;
+        return result;
     }
 
-    private static JsonObject dumpRecipe(ResourceLocation id, Recipe<?> recipe, HolderLookup.Provider registries) throws RecipeDumpException {
+    private static JsonObject dumpRecipe(ResourceLocation id, Recipe<?> recipe, IRecipeDumper<Recipe<?>> dumper, HolderLookup.Provider registries) throws RecipeDumpException {
         JsonObject jsonObject = new JsonObject();
-        IRecipeDumper<Recipe<?>> dumper = RecipeDumpers.get(recipe.getClass());
         jsonObject.addProperty("type", dumper.getRecipeTypeName(recipe));
         jsonObject.addProperty("name", id.toString());
+
         RecipeInputs inputs = new RecipeInputs();
         RecipeOutputs outputs = new RecipeOutputs();
         dumper.setInputs(recipe, inputs);
@@ -122,6 +127,13 @@ DumpRecipeCommand {
         return jsonObject;
     }
 
+    private static String sanitizeCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return "unknown";
+        }
+        return category.replace(':', '_').replaceAll("[^a-zA-Z0-9_.-]", "_");
+    }
+
     private static void outputJson(File file, JsonElement element) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try {
@@ -129,10 +141,66 @@ DumpRecipeCommand {
             if (parent != null && !parent.exists() && !parent.mkdirs()) {
                 Constants.LOG.warn("Failed to create directory {}", parent);
             }
-            Files.write(file.toPath(), gson.toJson(element).getBytes(StandardCharsets.UTF_8));
+            Files.writeString(file.toPath(), gson.toJson(element), StandardCharsets.UTF_8);
         } catch (IOException e) {
             Constants.LOG.error("Failed to write recipe dump file", e);
         }
     }
-}
 
+    public static final class DumpResult {
+        private final Map<String, JsonArray> categoryRecipes = new TreeMap<>();
+        private final Set<ResourceLocation> errorRecipes = new HashSet<>();
+
+        private void addRecipe(String category, JsonObject recipe) {
+            categoryRecipes.computeIfAbsent(category, key -> new JsonArray()).add(recipe);
+        }
+
+        public int getDumpedCount() {
+            int count = 0;
+            for (JsonArray recipes : categoryRecipes.values()) {
+                count += recipes.size();
+            }
+            return count;
+        }
+
+        public int getSkippedCount() {
+            return errorRecipes.size();
+        }
+
+        public JsonObject createCategoriesJson() {
+            JsonObject json = new JsonObject();
+            categoryRecipes.forEach(json::add);
+            return json;
+        }
+
+        public JsonObject createErrorJson() {
+            JsonObject json = new JsonObject();
+            JsonArray recipes = new JsonArray();
+            errorRecipes.forEach(id -> recipes.add(id.toString()));
+            json.addProperty("count", errorRecipes.size());
+            json.add("recipes", recipes);
+            return json;
+        }
+
+        public JsonObject createSummary() {
+            JsonObject summary = new JsonObject();
+            JsonObject categoryCounts = new JsonObject();
+            categoryRecipes.forEach((category, recipes) -> categoryCounts.addProperty(category, recipes.size()));
+            summary.addProperty("dumped", getDumpedCount());
+            summary.addProperty("skipped", errorRecipes.size());
+            summary.addProperty("categoryCount", categoryRecipes.size());
+            summary.add("categories", categoryCounts);
+            return summary;
+        }
+
+        private void writeCategoryFiles(File outputDirectory) {
+            categoryRecipes.forEach((category, recipes) -> {
+                JsonObject categoryJson = new JsonObject();
+                categoryJson.addProperty("category", category);
+                categoryJson.addProperty("count", recipes.size());
+                categoryJson.add("recipes", recipes);
+                outputJson(new File(outputDirectory, category + ".json"), categoryJson);
+            });
+        }
+    }
+}

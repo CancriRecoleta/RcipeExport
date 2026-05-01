@@ -17,40 +17,39 @@ import net.minecraft.world.item.crafting.SmithingTrimRecipe;
 import net.minecraft.world.item.crafting.SmokingRecipe;
 import net.minecraft.world.item.crafting.StonecutterRecipe;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * 全局 RecipeDumper 注册表。其它模组可调用 {@link #register(Class, IRecipeDumper)} 注册自定义导出器。
- */
 public final class RecipeDumpers {
 
-    private static final Map<Class<? extends Recipe<?>>, IRecipeDumper<?>> DUMPERS = new HashMap<>();
+    private static final Map<Class<? extends Recipe<?>>, IRecipeDumper<?>> DUMPERS = new LinkedHashMap<>();
     private static boolean bootstrapped = false;
 
     private RecipeDumpers() {
     }
 
-    /**
-     * 注册一个配方导出器。dumper 的泛型 T 可以是 recipeClass 的父类（例如 AbstractCookingRecipe 的导出器
-     * 可以注册给 SmeltingRecipe / BlastingRecipe 等子类）。
-     */
     public static <T extends Recipe<?>> void register(Class<T> recipeClass, IRecipeDumper<? super T> dumper) {
         DUMPERS.put(recipeClass, dumper);
     }
 
     @SuppressWarnings("unchecked")
     public static IRecipeDumper<Recipe<?>> get(Class<?> recipeClass) {
-        return (IRecipeDumper<Recipe<?>>) DUMPERS.get(recipeClass);
+        IRecipeDumper<?> exact = DUMPERS.get(recipeClass);
+        if (exact != null) {
+            return (IRecipeDumper<Recipe<?>>) exact;
+        }
+        for (Map.Entry<Class<? extends Recipe<?>>, IRecipeDumper<?>> entry : DUMPERS.entrySet()) {
+            if (entry.getKey().isAssignableFrom(recipeClass)) {
+                return (IRecipeDumper<Recipe<?>>) entry.getValue();
+            }
+        }
+        return null;
     }
 
     public static boolean has(Class<?> recipeClass) {
-        return DUMPERS.containsKey(recipeClass);
+        return get(recipeClass) != null;
     }
 
-    /**
-     * 注册全部内置导出器。会被入口在加载阶段调用一次。
-     */
     public static synchronized void bootstrap() {
         if (bootstrapped) {
             return;
@@ -73,4 +72,3 @@ public final class RecipeDumpers {
         register(StonecutterRecipe.class, new StoneCuttingRecipeDumper());
     }
 }
-

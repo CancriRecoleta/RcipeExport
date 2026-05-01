@@ -16,7 +16,6 @@ public class ShapedRecipeDumper implements IRecipeDumper<ShapedRecipe> {
             Ingredient ingredient = ingredients.get(i);
             int x = i % width;
             int y = i / width;
-            // 沿用原项目惯例：按 3 列网格槽位编号（1..9）
             inputs.addInput(y * 3 + x + 1, ingredient);
         }
     }
@@ -25,5 +24,9 @@ public class ShapedRecipeDumper implements IRecipeDumper<ShapedRecipe> {
     public String getRecipeTypeName(ShapedRecipe recipe) {
         return "crafting_shaped";
     }
-}
 
+    @Override
+    public String getRecipeCategoryName(ShapedRecipe recipe) {
+        return "crafting_shaped";
+    }
+}

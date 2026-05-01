@@ -2,7 +2,6 @@ package com.github.recipeexport.platform;
 
 import com.github.recipeexport.platform.services.IPlatformHelper;
 import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.metadata.ModMetadata;
 
 import java.util.Collection;
 import java.util.stream.Collectors;
