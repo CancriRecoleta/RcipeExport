@@ -9,7 +9,6 @@ public class RecipeExport implements ModInitializer {
     @Override
     public void onInitialize() {
         CommonClass.init();
-        Constants.LOG.info("Registering Fabric command callbacks");
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) ->
                 DumpRecipeCommand.register(dispatcher));
     }
