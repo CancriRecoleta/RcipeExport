@@ -2,7 +2,6 @@ package com.github.recipeexport;
 
 import com.github.recipeexport.dumper.impl.DumpRecipeCommand;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -12,10 +11,9 @@ public class RecipeExport {
 
     public RecipeExport(IEventBus eventBus) {
         CommonClass.init();
-        NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
     }
 
-    @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         DumpRecipeCommand.register(event.getDispatcher());
     }
