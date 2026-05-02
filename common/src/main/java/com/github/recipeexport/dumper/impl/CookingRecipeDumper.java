@@ -9,13 +9,13 @@ public class CookingRecipeDumper implements IRecipeDumper<AbstractCookingRecipe>
 
     @Override
     public void setInputs(AbstractCookingRecipe recipe, IRecipeInputs inputs) {
-        inputs.addInput(1, recipe.getIngredients().get(0));
+        inputs.addInput(1, recipe.input());
     }
 
     @Override
     public void writeExtraInformation(AbstractCookingRecipe recipe, JsonObject jsonObject) {
-        jsonObject.addProperty("experience", recipe.getExperience());
-        jsonObject.addProperty("cookTime", recipe.getCookingTime());
+        jsonObject.addProperty("experience", recipe.experience());
+        jsonObject.addProperty("cookTime", recipe.cookingTime());
     }
 }
 

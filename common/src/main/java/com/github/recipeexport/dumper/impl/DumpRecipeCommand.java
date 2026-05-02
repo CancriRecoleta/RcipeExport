@@ -19,7 +19,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
@@ -43,7 +43,10 @@ public final class DumpRecipeCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("dumprecipe")
-                .requires(src -> src.getServer().isSingleplayer() || src.hasPermission(2))
+                .requires(src -> {
+                    var server = src.getServer();
+                    return server != null && (server.isSingleplayer() || Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(src));
+                })
                 .then(Commands.argument("mod", StringArgumentType.word())
                         .suggests(MOD_SUGGESTIONS)
                         .executes(DumpRecipeCommand::executeCommand)
@@ -87,7 +90,7 @@ public final class DumpRecipeCommand {
     public static DumpResult dumpAllRecipes(RecipeManager recipeManager, String modFilter, HolderLookup.Provider registries) {
         DumpResult result = new DumpResult();
         for (RecipeHolder<?> holder : recipeManager.getRecipes()) {
-            ResourceLocation id = holder.id();
+            Identifier id = holder.id().identifier();
             Recipe<?> recipe = holder.value();
             if (!id.getNamespace().equals(modFilter)) {
                 continue;
@@ -112,7 +115,7 @@ public final class DumpRecipeCommand {
         return result;
     }
 
-    private static JsonObject dumpRecipe(ResourceLocation id, Recipe<?> recipe, IRecipeDumper<Recipe<?>> dumper, HolderLookup.Provider registries) throws RecipeDumpException {
+    private static JsonObject dumpRecipe(Identifier id, Recipe<?> recipe, IRecipeDumper<Recipe<?>> dumper, HolderLookup.Provider registries) throws RecipeDumpException {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("type", dumper.getRecipeTypeName(recipe));
         jsonObject.addProperty("name", id.toString());
@@ -149,7 +152,7 @@ public final class DumpRecipeCommand {
 
     public static final class DumpResult {
         private final Map<String, JsonArray> categoryRecipes = new TreeMap<>();
-        private final Set<ResourceLocation> errorRecipes = new HashSet<>();
+        private final Set<Identifier> errorRecipes = new HashSet<>();
 
         private void addRecipe(String category, JsonObject recipe) {
             categoryRecipes.computeIfAbsent(category, key -> new JsonArray()).add(recipe);
