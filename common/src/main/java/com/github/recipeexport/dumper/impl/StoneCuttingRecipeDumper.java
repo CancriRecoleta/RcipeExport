@@ -8,7 +8,7 @@ public class StoneCuttingRecipeDumper implements IRecipeDumper<StonecutterRecipe
 
     @Override
     public void setInputs(StonecutterRecipe recipe, IRecipeInputs inputs) {
-        inputs.addInput(1, recipe.getIngredients().get(0));
+        inputs.addInput(1, recipe.input());
     }
 }
 

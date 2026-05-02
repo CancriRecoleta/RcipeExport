@@ -87,7 +87,7 @@ public final class DumpRecipeCommand {
     public static DumpResult dumpAllRecipes(RecipeManager recipeManager, String modFilter, HolderLookup.Provider registries) {
         DumpResult result = new DumpResult();
         for (RecipeHolder<?> holder : recipeManager.getRecipes()) {
-            ResourceLocation id = holder.id();
+            ResourceLocation id = holder.id().location();
             Recipe<?> recipe = holder.value();
             if (!id.getNamespace().equals(modFilter)) {
                 continue;

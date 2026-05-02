@@ -82,6 +82,3 @@ sourceSets.each {
     it.java.destinationDirectory = dir
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
